@@ -1,7 +1,6 @@
 from tensorflow.keras.models import load_model
 import numpy as np
 import joblib
-import os
 from pathlib import Path
 
 class AttackDetector:

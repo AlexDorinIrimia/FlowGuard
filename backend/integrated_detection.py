@@ -1,5 +1,3 @@
-import threading
-import time
 from scapy.all import *
 from packet_capture.FlowManager import FlowManager
 from ml_model.utils.AttackDetector import AttackDetector
@@ -21,6 +19,7 @@ class IntegratedDetectionSystem:
 
     def packet_handler(self, packet):
         """Callback for handling captured packets"""
+        print(f"[+] Packet captured: {packet.summary()}")
         with self.flow_lock:
             self.flow_manager.add_packet(packet)
 
@@ -56,8 +55,13 @@ class IntegratedDetectionSystem:
                     confidence=confidence_value
                 )
                 
-                # Send notification with 10 seconds duration
+                # Send notification with 10-seconds duration
                 send_notificaton(title, message, duration=10)
+
+                self.logger.get_logger().warning(f"[ALERT] Threat Detected: {threat_type} | "
+                               f"Src: {source_ip} -> Dst: {destination_ip} | "
+                               f"Protocol: {protocol} | Packets: {packet_count} | "
+                               f"Confidence: {confidence_value:.2f}")
                 
         except Exception as e:
             print(f"Error analyzing flow: {str(e)}")

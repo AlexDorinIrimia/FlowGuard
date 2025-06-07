@@ -1,12 +1,7 @@
 from scapy.all import *
-import ctypes
-import sys
 import threading
 import time
-from tensorflow.keras.models import load_model
-import numpy as np
-import joblib
-import os
+
 
 class PacketSniffer:
     def __init__(self, interface=None, packet_callback=None):
@@ -19,39 +14,40 @@ class PacketSniffer:
         print(f"[DEBUG] Initialized with interface: {self.interface}")
 
     def _select_interface(self):
-        """Auto-detect or prompt user to select a network interface."""
+        """Auto-detect or prompt the user to select a network interface."""
         print("[DEBUG] Selecting interface")
         try:
             selected_interface = get_working_if()
             return selected_interface
         except Exception:
             # Get all interfaces with their descriptions
-            from scapy.arch.windows import get_windows_if_list  # For Windows
-            interfaces = get_windows_if_list()
-            print("\nAvailable interfaces:")
-            for idx, iface in enumerate(interfaces, 1):
-                print(f"{idx}. {iface['name']} - {iface['description']}")
-
-            if not interfaces:
-                print("[ERROR] No network interfaces found!")
-                return None
-        
-            while True:
-                try:
-                    choice = int(input("Select an interface number: ")) - 1
-                    if 0 <= choice < len(interfaces):
-                        selected_interface = interfaces[choice]['name']
-                        print(f"[DEBUG] Selected interface: {selected_interface}")
-                        return selected_interface
-                    else:
-                        print("Invalid selection. Please choose a valid number.")
-                except ValueError:
-                    print("Invalid input. Please enter a number.")
-                except Exception as e:
-                    print(f"[ERROR] Error in interface selection: {str(e)}")
-                    return None
+            return self._manual_selection()
         finally:
             print("[DEBUG] Interface selection completed")
+
+    def _manual_selection(self):
+        from scapy.arch.windows import get_windows_if_list  # For Windows
+        interfaces = get_windows_if_list()
+        print("\nAvailable interfaces:")
+        for idx, iface in enumerate(interfaces, 1):
+            print(f"{idx}. {iface['name']} - {iface['description']}")
+        if not interfaces:
+            print("[ERROR] No network interfaces found!")
+            return None
+        while True:
+            try:
+                choice = int(input("Select an interface number: ")) - 1
+                if 0 <= choice < len(interfaces):
+                    selected_interface = interfaces[choice]['name']
+                    print(f"[DEBUG] Selected interface: {selected_interface}")
+                    return selected_interface
+                else:
+                    print("Invalid selection. Please choose a valid number.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+            except Exception as e:
+                print(f"[ERROR] Error in interface selection: {str(e)}")
+                return None
 
     def _should_stop_filter(self, _):
         return not self.running
