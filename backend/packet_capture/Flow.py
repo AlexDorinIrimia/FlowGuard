@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from scapy.layers.inet import IP,TCP
+from scapy.layers.inet import IP,TCP,UDP
 
 
 class Flow:
@@ -40,6 +40,13 @@ class Flow:
             self.backward_lengths.append(pkt_len)
             self.backward_header_lengths.append(header_len)
             self.backward_flags.append(flags)
+
+    def get_dest_port(self):
+        if self.packets:
+            pkt = self.packets[0]
+            if TCP in pkt or UDP in pkt:
+                return pkt.dport
+        return 0
 
     def get_direction(self, packet):
         src_ip = packet[IP].src
@@ -110,7 +117,7 @@ class Flow:
         fwd_header_len = sum(self.forward_header_lengths)
 
         return [
-            self.key[3], duration, total_fwd, total_bwd, total_len_fwd, total_len_bwd,
+            self.get_dest_port(),duration, total_fwd, total_bwd, total_len_fwd, total_len_bwd,
             fwd_len_max, fwd_len_min, fwd_len_mean, fwd_len_std,
             bwd_len_max, bwd_len_min, bwd_len_mean, bwd_len_std,
             total_len_fwd + total_len_bwd / duration if duration > 0 else 0,
@@ -134,3 +141,6 @@ class Flow:
             0, 0, 0, 0,  # Active window
             0, 0, 0, 0   # Idle window
         ]
+    @property
+    def packet_count(self):
+        return len(self.packets)

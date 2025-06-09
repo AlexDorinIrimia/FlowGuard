@@ -10,7 +10,7 @@ def format_alert_message(threat_type: str, source_ip: str, destination_ip: str, 
         f"Destination IP: {destination_ip}\n"
         f"Protocol: {protocol}\n"
         f"Packet Count: {packet_count}\n"
-        f"Detection Confidence: {confidence * 100:.2f}%\n"
+        f"Detection Confidence: {confidence:.2f}%\n"
     )
     return title, message
 

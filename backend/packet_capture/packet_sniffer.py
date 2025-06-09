@@ -1,4 +1,4 @@
-from scapy.all import *
+from scapy.all import AsyncSniffer
 import threading
 import time
 
@@ -16,14 +16,14 @@ class PacketSniffer:
     def _select_interface(self):
         """Auto-detect or prompt the user to select a network interface."""
         print("[DEBUG] Selecting interface")
-        try:
-            selected_interface = get_working_if()
-            return selected_interface
-        except Exception:
+        #try:
+            #selected_interface = get_working_if()
+            #return selected_interface
+        #except Exception:
             # Get all interfaces with their descriptions
-            return self._manual_selection()
-        finally:
-            print("[DEBUG] Interface selection completed")
+        return self._manual_selection()
+        #finally:
+            #print("[DEBUG] Interface selection completed")
 
     def _manual_selection(self):
         from scapy.arch.windows import get_windows_if_list  # For Windows
@@ -55,62 +55,48 @@ class PacketSniffer:
     def start_sniffing(self):
         """Start the packet sniffer."""
         print("[DEBUG] Starting sniffing process")
-
         if not self.interface:
             print("[ERROR] No interface selected!")
             return
-
         if self.running:
             print("[DEBUG] Sniffer is already running")
             return
 
-        try:
-            print(f"[+] Starting sniffing on interface: {self.interface}")
-            self.sniff_thread = threading.Thread(target=self._sniff_loop)
-            self.sniff_thread.daemon = True
-            print("[DEBUG] Starting sniff thread")
-            self.sniff_thread.start()
-            print("[DEBUG] Sniff thread started")
-            self.running = True
-        except Exception as e:
-            print(f"[ERROR] Failed to start sniffing: {str(e)}")
-            self.running = False
+        self.running = True
+        self.sniff_thread = threading.Thread(target=self._sniff_loop, daemon=True)
+        self.sniff_thread.start()
 
     def _sniff_loop(self):
         """Internal method for sniffing loop."""
         print("[DEBUG] Entered sniff loop")
         try:
             print("[DEBUG] Starting Scapy sniff")
-            self.sniffer = sniff(
+            self.sniffer = AsyncSniffer(
                 iface=self.interface,
                 prn=self.packet_callback,
                 store=False,
+                promisc=True,
+                filter='ip',
                 stop_filter=self._should_stop_filter
             )
-            print("[DEBUG] Scapy sniff completed")
+            self.sniffer.start()
+            print("[DEBUG] Scapy sniff started")
+            self.sniffer.join()
+            print("[DEBUG] Scapy sniff stopped")
         except Exception as e:
             print(f"[ERROR] Error in sniffing loop: {str(e)}")
             self.running = False
 
     def stop_sniffing(self):
-        """Stop sniffing cleanly."""
         print("[DEBUG] Stopping sniffer")
-        self.running = False
-
-        if self.sniff_thread and self.sniff_thread.is_alive():
-            try:
-                print("[DEBUG] Joining sniff thread")
-                self.sniff_thread.join(timeout=2)
-                if self.sniff_thread.is_alive():
-                    print("[WARNING] Sniffer thread did not stop gracefully")
-            except Exception as e:
-                print(f"[ERROR] Error stopping sniffer: {str(e)}")
+        if self.sniffer:
+            self.sniffer.stop()
+            self.sniffer = None
         print("[DEBUG] Sniffer stopped")
 
     def default_packet_handler(self, packet):
         """Default packet handler if none is provided"""
         print(f"[PACKET] {packet.summary()}")
-
 
 if __name__ == "__main__":
     sniffer = PacketSniffer()
