@@ -1,10 +1,12 @@
-import time
 from backend.packet_capture.Flow import Flow
 
 class FlowManager:
-    def __init__(self, timeout=30):
-        self.flows = {}  # key -> Flow instance
-        self.timeout = timeout  # flow timeout in seconds
+    def __init__(self, timeout=30, max_lifetime=300, min_packets=5, min_duration=2.0):
+        self.flows = {}
+        self.timeout = timeout
+        self.max_lifetime = max_lifetime
+        self.min_packets = min_packets
+        self.min_duration = min_duration
 
     def _generate_flow_key(self, packet):
         if 'IP' not in packet:
@@ -13,12 +15,13 @@ class FlowManager:
         src = (packet['IP'].src, packet['IP'].sport if 'TCP' in packet or 'UDP' in packet else 0)
         dst = (packet['IP'].dst, packet['IP'].dport if 'TCP' in packet or 'UDP' in packet else 0)
         key = tuple(sorted([src, dst])) + (proto,)
-        return key
+        return key, packet['IP'].src
 
     def add_packet(self, packet):
-        key = self._generate_flow_key(packet)
-        if key is None:
+        result = self._generate_flow_key(packet)
+        if result is None:
             return
+        key, initiator_ip = result
 
         if key not in self.flows:
             self.flows[key] = Flow(key)
@@ -26,20 +29,20 @@ class FlowManager:
         self.flows[key].add_packet(packet)
 
     def extract_expired_flows(self):
-        now = time.time()
         expired = []
-
         for key in list(self.flows.keys()):
             flow = self.flows[key]
-            if flow.is_inactive(self.timeout):
-                # Only expire if it had more than 1 packet or aged past a grace period
-                if flow.packet_count > 1 or (now - flow.first_seen > self.timeout + 5):
+            if flow.is_expired(self.timeout, self.max_lifetime):
+                if flow.packet_count >= self.min_packets or flow.get_duration() >= self.min_duration:
                     expired.append((key, self.flows.pop(key)))
-
+                else:
+                    self.flows.pop(key)  # Drop short/irrelevant flows
         return expired
 
     def force_expire_all(self):
-        """Use at the end of a capture to flush all flows."""
-        expired = list(self.flows.items())
+        expired = []
+        for key, flow in self.flows.items():
+            if flow.packet_count >= self.min_packets or flow.get_duration() >= self.min_duration:
+                expired.append((key, flow))
         self.flows.clear()
         return expired

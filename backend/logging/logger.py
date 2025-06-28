@@ -26,7 +26,6 @@ class IDSLogger:
         file_handler = logging.FileHandler(log_path)
         file_handler.setFormatter(formatter)
 
-        # Stream handler (optional: print to console)
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
 
