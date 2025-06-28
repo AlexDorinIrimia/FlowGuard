@@ -32,6 +32,7 @@ a = Analysis(
 
         # Fișierul VERSION necesar pentru xgboost
         ('libs/xgboost/VERSION', 'xgboost'),
+        ('logs/', 'logs'),
     ],
 
     hiddenimports=(
