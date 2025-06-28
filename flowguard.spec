@@ -42,12 +42,12 @@ a = Analysis(
         collect_submodules('backend') +
         collect_submodules('flask_socketio') +
         collect_submodules('socketio') +
-        collect_submodules('engineio') #+
-        #[
-        #    'plyer.platforms.win.notification',
-        #    'plyer.platforms.linux.notification',
-        #    'plyer.platforms.darwin.notification',
-        #]
+        collect_submodules('engineio') +
+        [
+            'plyer.platforms.win.notification',
+            'plyer.platforms.linux.notification',
+            'plyer.platforms.darwin.notification',
+        ]
     ),
 
     hookspath=[],
