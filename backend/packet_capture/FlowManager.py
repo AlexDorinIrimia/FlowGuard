@@ -1,4 +1,4 @@
-from scapy.layers import IP, TCP, UDP
+from scapy.layers.inet import IP, TCP, UDP
 from backend.packet_capture.Flow import Flow
 
 class FlowManager:
