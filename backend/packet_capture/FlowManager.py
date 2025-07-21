@@ -1,4 +1,3 @@
-from scapy.layers import IP, TCP, UDP
 from backend.packet_capture.Flow import Flow
 
 class FlowManager:
@@ -10,26 +9,19 @@ class FlowManager:
         self.min_duration = min_duration
 
     def _generate_flow_key(self, packet):
-        if IP not in packet:
+        if 'IP' not in packet:
             return None
-        ip_layer = packet[IP]
-        proto = ip_layer.proto
-
-        # TCP sau UDP -> extragem porturile
-        if TCP in packet:
-            sport, dport = packet[TCP].sport, packet[TCP].dport
-        elif UDP in packet:
-            sport, dport = packet[UDP].sport, packet[UDP].dport
-        else:
-            sport, dport = 0, 0  # fallback pentru ICMP etc.
-
-        key = (ip_layer.src, sport, ip_layer.dst, dport, proto)
-        return key
+        proto = packet['IP'].proto
+        src = (packet['IP'].src, packet['IP'].sport if 'TCP' in packet or 'UDP' in packet else 0)
+        dst = (packet['IP'].dst, packet['IP'].dport if 'TCP' in packet or 'UDP' in packet else 0)
+        key = tuple(sorted([src, dst])) + (proto,)
+        return key, packet['IP'].src
 
     def add_packet(self, packet):
-        key = self._generate_flow_key(packet)
-        if key is None:
+        result = self._generate_flow_key(packet)
+        if result is None:
             return
+        key, initiator_ip = result
 
         if key not in self.flows:
             self.flows[key] = Flow(key)
