@@ -1,56 +1,105 @@
+import time
 from scapy.layers.inet import IP, TCP, UDP
-from backend.packet_capture.Flow import Flow
+from enum import Enum
+from .Flow import Flow
+
+class PacketDirection(Enum):
+    FORWARD = 1
+    REVERSE = 2
 
 class FlowManager:
-    def __init__(self, timeout=30, max_lifetime=300, min_packets=5, min_duration=2.0):
+    def __init__(self, inactivity_timeout=15, max_lifetime=180):
         self.flows = {}
-        self.timeout = timeout
+        self.inactivity_timeout = inactivity_timeout
         self.max_lifetime = max_lifetime
-        self.min_packets = min_packets
-        self.min_duration = min_duration
 
-    def _generate_flow_key(self, packet):
-        if IP not in packet:
+    def get_packet_flow_key(self, packet):
+        """Return a normalized flow key for matching packets."""
+        if packet is None or IP not in packet:
             return None
-        ip_layer = packet[IP]
-        proto = ip_layer.proto
 
-        # TCP sau UDP -> extragem porturile
+        ip = packet[IP]
+        proto = ip.proto
+        sport = dport = 0
         if TCP in packet:
-            sport, dport = packet[TCP].sport, packet[TCP].dport
+            sport = packet[TCP].sport
+            dport = packet[TCP].dport
         elif UDP in packet:
-            sport, dport = packet[UDP].sport, packet[UDP].dport
-        else:
-            sport, dport = 0, 0  # fallback pentru ICMP etc.
+            sport = packet[UDP].sport
+            dport = packet[UDP].dport
 
-        key = (ip_layer.src, sport, ip_layer.dst, dport, proto)
-        return key
+        key1 = (ip.src, sport, ip.dst, dport, proto)
+        key2 = (ip.dst, dport, ip.src, sport, proto)
+
+        # Normalizare: aceeași cheie pentru pachete forward și reverse
+        return min(key1, key2)
 
     def add_packet(self, packet):
-        key = self._generate_flow_key(packet)
+        """Adaugă un pachet într-un flow existent sau creează unul nou."""
+        if packet is None or IP not in packet:
+            return
+
+        now = getattr(packet, "time", time.time())
+        key = self.get_packet_flow_key(packet)
         if key is None:
             return
 
-        if key not in self.flows:
-            self.flows[key] = Flow(key)
+        count = 0
+        while True:
+            flow = self.flows.get((key, count))
+            if flow is None:
+                flow = Flow(key)
+                self.flows[(key, count)] = flow
+                break
 
-        self.flows[key].add_packet(packet)
+            if flow.last_seen is None:
+                break
 
-    def extract_expired_flows(self):
+            inactive = (now - flow.last_seen) > self.inactivity_timeout
+            max_life = (now - flow.first_seen) > self.max_lifetime
+            finished = flow.finished
+
+            if inactive or max_life or finished:
+                count += 1
+                continue
+            break
+
+        # Adaugă pachetul în flow
+        flow.add_packet(packet)
+
+    def extract_expired_flows(self, current_time=None):
+        """Returnează listele de flow-uri expirate și retransmisii, ștergându-le din manager."""
         expired = []
-        for key in list(self.flows.keys()):
-            flow = self.flows[key]
-            if flow.is_expired(self.timeout, self.max_lifetime):
-                if flow.packet_count >= self.min_packets or flow.get_duration() >= self.min_duration:
-                    expired.append((key, self.flows.pop(key)))
+        retrans_only = []
+        now = current_time or time.time()
+        to_delete = []
+
+        for k, flow in self.flows.items():
+            if flow.last_seen is None:
+                to_delete.append(k)
+                continue
+
+            inactive = (now - flow.last_seen) > self.inactivity_timeout
+            max_life = (now - flow.first_seen) > self.max_lifetime
+            finished = flow.finished
+
+            if inactive or max_life or finished:
+                if getattr(flow, "retrans_only", False):
+                    retrans_only.append(flow)
                 else:
-                    self.flows.pop(key)  # Drop short/irrelevant flows
-        return expired
+                    expired.append(flow)
+                to_delete.append(k)
+
+        for k in to_delete:
+            del self.flows[k]
+
+        return expired, retrans_only
 
     def force_expire_all(self):
-        expired = []
-        for key, flow in self.flows.items():
-            if flow.packet_count >= self.min_packets or flow.get_duration() >= self.min_duration:
-                expired.append((key, flow))
+        """Expirează toate flow-urile și returnează feature-urile lor."""
+        expired_features = []
+        for flow in self.flows.values():
+            if flow is not None:
+                expired_features.append(flow.extract_features())
         self.flows.clear()
-        return expired
+        return expired_features
