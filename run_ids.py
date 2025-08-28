@@ -1,4 +1,3 @@
-import sys
 import threading
 import time
 import signal
@@ -6,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "backend")))
 from backend.integrated_detection import IntegratedDetectionSystem
-from web_ui.ui_server import app, socketio
+from web_ui.ui_server import app, socketio, selected_interface
 
 def run_web_ui():
     """Run the web UI server"""
@@ -20,9 +19,15 @@ def run_web_ui():
 
 def run_ids():
     """Run the IDS"""
-    ids = IntegratedDetectionSystem()
+    while not selected_interface["name"]:
+        print("Waiting for interface selection...")
+        time.sleep(1)
+
+    iface = selected_interface["name"]
+    print(f"Starting IDS on interface {iface}")
+    ids = IntegratedDetectionSystem(interface=iface)
+    ids.start()
     try:
-        ids.start()
         print("[+] IDS started successfully")
         
         # Keep the IDS running
