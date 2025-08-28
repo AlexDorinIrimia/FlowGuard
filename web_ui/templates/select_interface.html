@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Interface</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f1f2f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #ifaceSelectContainer {
+            max-width: 400px;
+            width: 90%;
+            padding: 30px 25px;
+            border-radius: 12px;
+            background-color: #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        #ifaceSelectContainer h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        #ifaceSelectContainer label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        #ifaceSelectContainer select {
+            width: 80%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            background-color: #fff;
+            transition: border-color 0.2s ease;
+        }
+
+        #ifaceSelectContainer select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+        }
+
+        #ifaceSelectContainer button {
+            width: 85%;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        #ifaceSelectContainer button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+<div id="ifaceSelectContainer">
+    <h2>Selectează interfața pentru IDS</h2>
+    <form method="post">
+        <label for="iface">Interfață:</label>
+        <select name="iface" id="iface" required>
+            {% for iface in interfaces %}
+            <option value="{{ iface }}">{{ iface }}</option>
+            {% endfor %}
+        </select>
+        <br>
+        <button type="submit">Pornește IDS</button>
+    </form>
+</div>
+</body>
+</html>
