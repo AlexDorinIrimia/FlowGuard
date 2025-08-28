@@ -7,8 +7,6 @@ import joblib
 from tensorflow.keras.losses import Huber
 from backend.packet_capture.Flow import Flow
 
-
-
 class AttackDetector:
 
     def __init__(self):
@@ -64,8 +62,8 @@ class AttackDetector:
             err = float(tf.reduce_mean(err_tensor).numpy())
             print(f"AE error: {err}")
             conf_ae = self.ae_confidence(err)
-            if err > self.ae_thr:
-                return ['ATTACK'], conf_ae
+            if err < self.ae_thr:
+                return ['BENIGN'], conf_ae
 
             # ── Encode latent features ───────────────
             latent = self.encoder.predict(df_scaled, verbose=0)
