@@ -1,37 +1,40 @@
-import logging
-import os
 from datetime import datetime
+from backend.DataBase.DataBase import Database
 
 class IDSLogger:
-    def __init__(self, log_dir="logs", log_filename=None):
-        self.log_dir = log_dir
-        os.makedirs(log_dir, exist_ok=True)
+    def __init__(self, agent_id):
+        self.db = Database().get_client()
+        self.agent_id = agent_id
 
-        if log_filename is None:
-            log_filename = f"ids_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    def log(self, level: str, message: str, src_ip=None, dst_ip=None, confidence=None):
+        # Inserare log în Supabase
+        self.db.from_("alerts").insert({
+            "agent_id": self.agent_id,
+            "alert_type": level,
+            "source_ip": src_ip,
+            "destination_ip": dst_ip,
+            "confidence": confidence,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": message
+        }).execute()
 
-        log_path = os.path.join(log_dir, log_filename)
+    def fetch_logs(self, limit=100, offset=0):
+        """
+        Returnează lista de loguri pentru JS.
+        Nu include 'id' și 'agent_id'.
+        """
+        try:
+            result = (
+                self.db.from_("alerts")
+                .select("timestamp, source_ip, destination_ip, alert_type, confidence, message")
+                .order("timestamp", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
 
-        # Create logger
-        self.logger = logging.getLogger("IDSLogger")
-        self.logger.setLevel(logging.DEBUG)
+            logs = result.data if result.data else []
+            return logs
 
-        # Formatter
-        formatter = logging.Formatter(
-            fmt="%(asctime)s [%(levelname)s] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        )
-
-        # File handler
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(formatter)
-
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-
-        # Add handlers
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(stream_handler)
-
-    def get_logger(self):
-        return self.logger
+        except Exception as e:
+            print("[fetch_logs] ERROR:", e)
+            return []
