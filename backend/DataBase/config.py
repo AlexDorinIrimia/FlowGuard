@@ -1,0 +1,2 @@
+SUPABASE_URL = "https://nxtuunjiuwdohitfenal.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54dHV1bmppdXdkb2hpdGZlbmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODEyMTYsImV4cCI6MjA3MTI1NzIxNn0.I8oErfY7xTJJFDXzssQAjo66QWltLXNIAujw-cWD-Tg"
