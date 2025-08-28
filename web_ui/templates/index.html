@@ -24,11 +24,6 @@
             <span id="lastUpdated"></span>
         </div>
     </header>
-    <div class="interface-selector">
-        <label for="interface">Select Interface:</label>
-        <select id="interface"></select>
-        <button id="applyIface">Apply</button>
-    </div>
     <section class="graph">
         <h2>Live Traffic</h2>
         <div class="graph-container">
@@ -64,8 +59,9 @@
                 <th>Time</th>
                 <th>Source IP</th>
                 <th>Destination IP</th>
-                <th>Threat</th>
+                <th>Type</th>
                 <th>Confidence</th>
+                <th>Message</th>
             </tr>
             </thead>
             <tbody id="alertsTableBody">
@@ -77,125 +73,123 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 <script>
-    // Initialize Socket.IO
+    // --- Socket.IO ---
     const socket = io();
-    
-    // Listen for new alerts
-    socket.on('new_alert', function(alert) {
-        function updateRecentAlerts() {
-            const alertsTableBody = document.getElementById('alertsTableBody');
-        const lastUpdated = document.getElementById('lastUpdated');
+    const recentTableBody = document.getElementById('alertsTableBody');
+    const lastUpdated = document.getElementById("lastUpdated");
+    const maxAlerts = 5;
 
-        // Create a new row for the incoming alert
-        const row = document.createElement('tr');
+    // Set pentru a preveni duplicatele
+    const existingAlerts = new Set();
+
+    // Funcție pentru adăugat alertă în tabel
+    function addAlertRow(alert) {
+        const alertKey = `${alert.timestamp}-${alert.source_ip}-${alert.destination_ip}`;
+        if (existingAlerts.has(alertKey)) return; // previne duplicate
+        existingAlerts.add(alertKey);
+
+        // Conversie UTC → ora locală
+        let localTime = "";
+        if (alert.timestamp) {
+            const d = new Date(alert.timestamp);
+            localTime = d.toLocaleString("ro-RO", { timeZone: "Europe/Bucharest" });
+        }
+
+        const row = document.createElement("tr");
         row.innerHTML = `
-            <td class="timestamp">${alert.timestamp}</td>
-            <td class="ip-address">${alert.source_ip}:${alert.source_port}</td>
-            <td class="ip-address">${alert.destination_ip}:${alert.destination_port}</td>
-            <td class="threat-type">${alert.threat_type}</td>
-            <td class="confidence">${alert.confidence}</td>
-        `;
+        <td class="timestamp">${localTime}</td>
+        <td class="ip-address">${alert.source_ip || ''}</td>
+        <td class="ip-address">${alert.destination_ip || ''}</td>
+        <td class="threat-type">${alert.alert_type || ''}</td>
+        <td class="confidence">${alert.confidence || ''}</td>
+        <td class="message">${alert.message || ''}</td>
+    `;
 
-        // Prepend the new alert row at the top of the table
-        if (alertsTableBody.firstChild && alertsTableBody.firstChild.textContent === 'No recent alerts') {
-            // Remove "No recent alerts" placeholder if present
-            alertsTableBody.innerHTML = '';
-        }
-        alertsTableBody.insertBefore(row, alertsTableBody.firstChild);
-
-        const maxAlerts = 5;
-        while (alertsTableBody.children.length > maxAlerts) {
-            alertsTableBody.removeChild(alertsTableBody.lastChild);
+        // Șterge placeholder "No recent alerts"
+        if (recentTableBody.firstChild && recentTableBody.firstChild.textContent.includes("No recent alerts")) {
+            recentTableBody.innerHTML = "";
         }
 
-        // Update last updated timestamp
-        lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        recentTableBody.insertBefore(row, recentTableBody.firstChild);
+
+        // Păstrează doar ultimele 5 alerte
+        while (recentTableBody.children.length > maxAlerts) {
+            const lastRow = recentTableBody.lastChild;
+            const lastAlertKey = `${lastRow.querySelector('.timestamp').textContent}-${lastRow.querySelectorAll('.ip-address')[0].textContent}-${lastRow.querySelectorAll('.ip-address')[1].textContent}`;
+            existingAlerts.delete(lastAlertKey);
+            recentTableBody.removeChild(lastRow);
         }
 
-        // Update recent alerts table
-        updateRecentAlerts();
-        
-        // Update traffic chart
-        updateTrafficData();
-        
-        // Update statistics
-        updateStats();
-    });
+        lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString("ro-RO", { timeZone: "Europe/Bucharest" })}`;
+    }
 
-    // Function to update statistics
+    // Ascultă alerte noi prin socket
+    socket.on("new_alert", addAlertRow);
+
+    // --- Load initial alerts ---
+    async function loadRecentAlerts() {
+        console.log(">>> loadRecentAlerts CALLED"); // DEBUG
+        const loadingSpinner = document.getElementById('recentLoading');
+        const errorMessage = document.getElementById('recentError');
+
+        if (loadingSpinner) loadingSpinner.style.display = 'block';
+        if (errorMessage) errorMessage.style.display = 'none';
+        recentTableBody.innerHTML = '';
+
+        try {
+            console.log(">>> fetching /api/recent_alerts ...");
+            const response = await fetch('/api/recent_alerts');
+            console.log(">>> fetch DONE, status:", response.status);
+
+            const result = await response.json();
+            console.log(">>> /api/recent_alerts RESPONSE:", result);
+
+            if (result.success && result.data.length > 0) {
+                result.data.forEach(alert => addAlertRow(alert));
+            } else {
+                recentTableBody.innerHTML = '<tr><td colspan="6" class="no-data">No recent alerts</td></tr>';
+            }
+        } catch (e) {
+            console.error('Error loading recent alerts:', e);
+            if (errorMessage) {
+                errorMessage.textContent = `Error loading recent alerts: ${e.message}`;
+                errorMessage.style.display = 'block';
+            }
+        } finally {
+            if (loadingSpinner) loadingSpinner.style.display = 'none';
+        }
+    }
+
+    function formatLocalTime(utcString) {
+        const date = new Date(utcString);
+        return date.toLocaleString(); // sau .toLocaleTimeString() dacă vrei doar ora
+    }
+
+    // --- Stats ---
     async function updateStats() {
         try {
             const response = await fetch('/api/stats');
-            if (!response.ok) throw new Error('Failed to fetch stats');
-            
             const result = await response.json();
             if (!result.success) throw new Error(result.error);
 
             const stats = result.data;
             document.getElementById('totalAlerts').textContent = stats.total_alerts;
             document.getElementById('recentAlerts').textContent = stats.recent_alerts_count;
-            document.getElementById('lastUpdate').textContent = stats.last_update;
-        } catch (error) {
-            console.error('Error updating stats:', error);
-        }
-    }
 
-    // Function to load recent alerts
-    async function loadRecentAlerts() {
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const errorMessage = document.getElementById('errorMessage');
-        const alertsTableBody = document.getElementById('alertsTableBody');
-        const lastUpdated = document.getElementById('lastUpdated');
+            if (stats.last_update) {
+                // Convertește din UTC în local timezone (browser-ul utilizatorului)
+                document.getElementById('lastUpdate').textContent = formatLocalTime(stats.last_update);
 
-        // Show loading spinner
-        loadingSpinner.style.display = 'block';
-        errorMessage.style.display = 'none';
-
-        try {
-            const response = await fetch('/api/recent-alerts');
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Clear existing rows
-                alertsTableBody.innerHTML = '';
-
-                if (result.data.length === 0) {
-                    alertsTableBody.innerHTML = '<tr><td colspan="5">No recent alerts</td></tr>';
-                } else {
-                    // Add each alert as a table row
-                    result.data.forEach(alert => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td class="timestamp">${alert.timestamp}</td>
-                            <td class="ip-address">${alert.source_ip}:${alert.source_port}</td>
-                            <td class="ip-address">${alert.destination_ip}:${alert.destination_port}</td>
-                            <td class="threat-type">${alert.threat_type}</td>
-                            <td class="confidence">${alert.confidence}</td>
-                        `;
-                        alertsTableBody.appendChild(row);
-                    });
-                }
-
-                lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
             } else {
-                throw new Error(result.error || 'Failed to fetch alerts');
+                document.getElementById('lastUpdate').textContent = "N/A";
             }
-
-        } catch (error) {
-            console.error('Error loading alerts:', error);
-            errorMessage.textContent = `Error loading alerts: ${error.message}`;
-            errorMessage.style.display = 'block';
-        } finally {
-            loadingSpinner.style.display = 'none';
+        } catch (e) {
+            console.error('Error updating stats:', e);
         }
     }
 
-    // Initialize traffic chart
+
+    // --- Traffic Chart ---
     let trafficChart;
     const maxDataPoints = 20;
     const trafficData = {
@@ -218,111 +212,57 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
-                },
+                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Packets'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
+                    y: { beginAtZero: true, title: { display: true, text: 'Packets' } },
+                    x: { title: { display: true, text: 'Time' } }
                 },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
-                }
+                interaction: { mode: 'nearest', axis: 'x', intersect: false }
             }
         });
     }
 
-    // Function to update traffic data
     async function updateTrafficData() {
-    try {
-        const response = await fetch('/api/traffic');
-        if (!response.ok) throw new Error('Failed to fetch traffic data');
+        try {
+            const response = await fetch('/api/traffic');
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error);
 
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error);
+            const points = result.data;
+            if (!points.length) return;
 
-        const points = result.data;
-        if (!points.length) return;
+            trafficData.labels = [];
+            trafficData.datasets[0].data = [];
+            points.slice(-maxDataPoints).forEach(point => {
+                trafficData.labels.push(new Date(point.timestamp).toLocaleTimeString());
+                trafficData.datasets[0].data.push(point.packet_count);
+            });
 
-        // Clear old data
-        trafficData.labels = [];
-        trafficData.datasets[0].data = [];
-
-        points.slice(-maxDataPoints).forEach(point => {
-            const timeLabel = new Date(point.timestamp).toLocaleTimeString();
-            trafficData.labels.push(timeLabel);
-            trafficData.datasets[0].data.push(point.packet_count);
-        });
-
-        trafficChart.update();
-    } catch (error) {
-        console.error('Error updating traffic data:', error);
+            trafficChart.update();
+        } catch (e) {
+            console.error('Error updating traffic data:', e);
+        }
     }
-}
 
-
-    // Load alerts and initialize chart when page loads
+    // --- Init ---
     document.addEventListener('DOMContentLoaded', function() {
+        console.log(">>> DOMContentLoaded FIRED"); // DEBUG
+
+        // Inițializări
         loadRecentAlerts();
         initTrafficChart();
+        updateTrafficData();
         updateStats();
-        
-        // Auto-refresh alerts every 30 seconds
-        setInterval(loadRecentAlerts, 30000);
-        
-        // Update traffic data every 5 seconds
+
+        // Refresh manual pentru alerts
+        const refreshBtn = document.getElementById('refreshRecentBtn');
+        if (refreshBtn) refreshBtn.addEventListener('click', loadRecentAlerts);
+
+        // Interval pentru stats și trafic
         setInterval(updateTrafficData, 5000);
-        updateTrafficData(); // Initial update
-        
-        // Update stats every minute
         setInterval(updateStats, 60000);
     });
 
-    fetch("/api/interfaces")
-    .then(response => response.json())
-    .then(data => {
-      const ifaceSelect = document.getElementById("interface");
-      data.interfaces.forEach(iface => {
-        const option = document.createElement("option");
-        option.value = iface;
-        option.text = iface;
-        ifaceSelect.appendChild(option);
-      });
-    });
-
-  // Handle interface selection
-  document.getElementById("applyIface").onclick = () => {
-    const selected = document.getElementById("interface").value;
-    socket.emit("select_interface", { interface: selected });
-  };
-
-  // Listen for confirmation
-  socket.on("interface_selected", (data) => {
-    if (data.success) {
-      alert("Interface changed to: " + data.interface);
-    } else {
-      alert("Error: " + data.error);
-    }
-  });
 </script>
 </body>
 </html>
