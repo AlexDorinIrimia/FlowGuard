@@ -3,15 +3,15 @@ from scapy.layers.inet import IP, TCP, UDP
 import time
 
 class Flow:
-    def __init__(self, key, retrans_delay=5):
+    def __init__(self, key):
         self.key = key
         self.packets = []
         self.first_seen = None
         self.last_seen = None
         self.finished = False
-        self.initiator_dest_port = None
         self.initiator_ip = None
         self.responder_ip = None
+        self.initiator_dest_port = None
 
         self.data = {
             'forward': {'times': [], 'lengths': [], 'header_lengths': [], 'flags': []},
@@ -25,50 +25,31 @@ class Flow:
         now = getattr(packet, "time", time.time())
         self.packets.append(packet)
 
-        # Initialize first packet info
         if self.first_seen is None:
             self.first_seen = now
-            self.last_seen = now
             self.initiator_ip = packet[IP].src
             self.responder_ip = packet[IP].dst
-
-            # primul pachet definește forward
-            self.direction_init = 'forward'
             if TCP in packet:
                 self.initiator_dest_port = packet[TCP].dport
             elif UDP in packet:
                 self.initiator_dest_port = packet[UDP].dport
 
-        direction = self.get_direction(packet)
         self.last_seen = now
+        direction = self.get_direction(packet)
 
         pkt_len = len(packet)
         header_len = len(packet[IP])
-        flags = 0
-        if TCP in packet:
-            flags = packet[TCP].flags
-            if flags & 0x01 or flags & 0x04:  # FIN sau RST
-                self.finished = True
-        self.data[direction]['flags'].append(flags if TCP in packet else 0)
+        flags = packet[TCP].flags if TCP in packet else 0
+        if TCP in packet and (flags & 0x01 or flags & 0x04):
+            self.finished = True
+
         self.data[direction]['times'].append(now)
         self.data[direction]['lengths'].append(pkt_len)
         self.data[direction]['header_lengths'].append(header_len)
+        self.data[direction]['flags'].append(flags)
 
     def get_direction(self, packet):
-        src_ip = packet[IP].src
-        dst_ip = packet[IP].dst
-        sport = dport = None
-        if TCP in packet:
-            sport, dport = packet[TCP].sport, packet[TCP].dport
-        elif UDP in packet:
-            sport, dport = packet[UDP].sport, packet[UDP].dport
-
-        # fallback pentru pachete non-TCP/UDP
-        if not sport or not dport:
-            return 'forward'
-
-        # compara cu initiator
-        if src_ip == self.initiator_ip:
+        if packet[IP].src == self.initiator_ip:
             return 'forward'
         return 'backward'
 
@@ -82,8 +63,8 @@ class Flow:
             return 0
         return np.mean(np.diff(np.array(times, dtype=float)))
 
-    def count_flag(self, direction, flag_mask):
-        return sum(bool(flag & flag_mask) for flag in self.data[direction]['flags'])
+    def count_flag(self, direction, mask):
+        return sum(1 for f in self.data[direction]['flags'] if f & mask)
 
     @property
     def packet_count(self):
@@ -117,18 +98,14 @@ class Flow:
         flow_iat_mean = self.compute_iat_mean(fwd['times'] + bwd['times'])
         avg_bwd_seg_size = total_len_bwd / subflow_bwd_pkts if subflow_bwd_pkts > 0 else 0
 
-        # TCP flag counts normalizate
-        def flag_ratio(mask):
-            return (self.count_flag('forward', mask) + self.count_flag('backward', mask)) / max(self.packet_count, 1)
-
-        fin_flag_cnt = flag_ratio(0x01)
-        syn_flag_cnt = flag_ratio(0x02)
-        rst_flag_cnt = flag_ratio(0x04)
-        psh_flag_cnt = flag_ratio(0x08)
-        ack_flag_cnt = flag_ratio(0x10)
-        urg_flag_cnt = flag_ratio(0x20)
-        ece_flag_cnt = flag_ratio(0x40)
-        cwr_flag_cnt = flag_ratio(0x80)
+        fin_flag_cnt = self.count_flag('forward', 0x01) + self.count_flag('backward', 0x01)
+        syn_flag_cnt = self.count_flag('forward', 0x02) + self.count_flag('backward', 0x02)
+        rst_flag_cnt = self.count_flag('forward', 0x04) + self.count_flag('backward', 0x04)
+        psh_flag_cnt = self.count_flag('forward', 0x08) + self.count_flag('backward', 0x08)
+        ack_flag_cnt = self.count_flag('forward', 0x10) + self.count_flag('backward', 0x10)
+        urg_flag_cnt = self.count_flag('forward', 0x20) + self.count_flag('backward', 0x20)
+        ece_flag_cnt = self.count_flag('forward', 0x40) + self.count_flag('backward', 0x40)
+        cwr_flag_cnt = self.count_flag('forward', 0x80) + self.count_flag('backward', 0x80)
 
         return [
             self.initiator_dest_port or 0, duration, total_len_fwd, fwd_pkt_max, fwd_pkt_mean, fwd_pkt_std,
