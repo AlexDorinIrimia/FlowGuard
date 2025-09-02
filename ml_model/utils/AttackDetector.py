@@ -33,11 +33,13 @@ class AttackDetector:
         encoder = Model(inputs=inputs, outputs=x)
         return encoder
 
-    def ae_confidence(self, re_error, mean=3.446036e-03, std=8.923405e-03):
+    def ae_confidence(self, re_error, mean=3.446036e-03, std=8.923405e-03, steepness=10):
         if std == 0:
-            return 1.0 if re_error <= mean else 0.0
+            return 1.0 if re_error > mean else 0.0
+        # transformare z
         z = (re_error - mean) / std
-        conf = 1 / (1 + np.exp(-5 * (z)))  # coef 5 pentru a face sigmoid mai abrupt
+        # sigmoid ca scor [0,1], mare = atac
+        conf = 1 / (1 + np.exp(-steepness * (z - 0.5)))
         return float(conf)
 
     def compute_confidence(self, ae_conf, svm_conf):
@@ -62,7 +64,8 @@ class AttackDetector:
             err = float(tf.reduce_mean(err_tensor).numpy())
             print(f"AE error: {err}")
             conf_ae = self.ae_confidence(err)
-            if err < self.ae_thr:
+            print(f"AE confidence: {conf_ae}")
+            if err <= self.ae_thr:
                 return ['BENIGN'], conf_ae
 
             # ── Encode latent features ───────────────
