@@ -44,12 +44,14 @@ class FlowManager:
         if key is None:
             return
 
+        # Folosim hash-ul pentru index în dictionar, dar păstrăm tuple în Flow
+        flow_hash = hash(key)
         count = 0
         while True:
-            flow = self.flows.get((key, count))
+            flow = self.flows.get((flow_hash, count))
             if flow is None:
-                flow = Flow(key)
-                self.flows[(key, count)] = flow
+                flow = Flow(key)  # Flow păstrează tuple-ul original
+                self.flows[(flow_hash, count)] = flow
                 break
 
             if flow.last_seen is None:
