@@ -129,8 +129,13 @@ from datetime import datetime, timezone
 @app.route("/api/stats")
 def get_stats():
     try:
+        # număr total de alerte
+        total_result = logger.db.from_("alerts").select("id", count="exact").execute()
+        total_alerts = total_result.count or 0
+
+        # ultimele 500 pentru statistici detaliate
         logs = logger.fetch_logs(limit=500)
-        total_alerts = len(logs)
+
         alerts_by_type = {}
         one_hour_ago_ts = datetime.utcnow().timestamp() - 3600
         recent_alerts_count = 0
@@ -147,10 +152,10 @@ def get_stats():
         return jsonify({
             "success": True,
             "data": {
-                "total_alerts": total_alerts,
+                "total_alerts": total_alerts,            # real din DB
                 "alerts_by_type": alerts_by_type,
                 "recent_alerts_count": recent_alerts_count,
-                "last_update": datetime.now(timezone.utc).isoformat()  # ISO 8601 cu UTC
+                "last_update": datetime.now(timezone.utc).isoformat()
             }
         })
     except Exception as e:
@@ -164,4 +169,5 @@ def traffic_api():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+
 
