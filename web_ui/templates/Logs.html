@@ -153,21 +153,26 @@
     logsTable.style.display = 'table';
   }
 
-  function updatePagination(pagination) {
-    const paginationControls = document.getElementById('paginationControls');
-    const pageInfo = document.getElementById('pageInfo');
-    const prevPage = document.getElementById('prevPage');
-    const nextPage = document.getElementById('nextPage');
+    function updatePagination(pagination) {
+  const paginationControls = document.getElementById('paginationControls');
+  const pageInfo = document.getElementById('pageInfo');
+  const prevPage = document.getElementById('prevPage');
+  const nextPage = document.getElementById('nextPage');
 
-    currentPage = pagination.current_page;
-    totalPages = pagination.total_pages;
+  currentPage = pagination.current_page;
+  totalPages = pagination.total_pages;
 
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-    prevPage.disabled = currentPage <= 1;
-    nextPage.disabled = currentPage >= totalPages;
+  // update statistic cards
+  document.getElementById('totalLogs').textContent = pagination.total_alerts || 0;
+  document.getElementById('currentPage').textContent = currentPage;
+  document.getElementById('totalPages').textContent = totalPages;
 
-    paginationControls.style.display = totalPages > 1 ? 'flex' : 'none';
-  }
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  prevPage.disabled = currentPage <= 1;
+  nextPage.disabled = currentPage >= totalPages;
+
+  paginationControls.style.display = totalPages > 1 ? 'flex' : 'none';
+}
 
   function changePage(direction) {
     const newPage = currentPage + direction;
@@ -186,3 +191,4 @@
 </script>
 </body>
 </html>
+
