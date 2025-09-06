@@ -14,12 +14,9 @@ a = Analysis(
     pathex=[os.path.abspath('.')],
 
     binaries=[
-        # Include xgboost.dll unde îl caută xgboost
-        ('libs/xgboost/lib/xgboost.dll', 'xgboost/lib'),
 
-        # Alte biblioteci native
         ('libs/msvcp140.dll', '.'),
-        ('libs/libscipy_openblas64.dll', '.'),
+        ('libs/libscipy_openblas-f07f5a5d207a3a47104dca54d6d0c86a.dll', '.'),
     ],
 
     datas=[
@@ -30,9 +27,6 @@ a = Analysis(
         ('web_ui/static/*', 'web_ui/static'),
         ('web_ui/templates/*', 'web_ui/templates'),
 
-        # Fișierul VERSION necesar pentru xgboost
-        ('libs/xgboost/VERSION', 'xgboost'),
-        ('logs/', 'logs'),
     ],
 
     hiddenimports=(
@@ -53,7 +47,7 @@ a = Analysis(
 
     hookspath=[],
     runtime_hooks=[],
-    excludes=['xgboost.testing'],
+    excludes=[],
     cipher=block_cipher
 )
 
