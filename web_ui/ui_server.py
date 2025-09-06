@@ -83,12 +83,13 @@ def api_logs():
         limit = int(request.args.get("limit", 100))
         offset = (page - 1) * limit
 
-        # Fetch logs din IDSLogger
+        # Fetch logs din IDSLogger pentru pagina curentă
         logs = logger.fetch_logs(limit=limit, offset=offset)
 
-        # Total alerts pentru pagination
-        total_result = logger.db.from_("alerts").select("id").execute()
-        total_alerts = len(total_result.data) if total_result.data else len(logs)
+        # Total alerts pentru pagination (fără limită 1000)
+        total_result = logger.db.from_("alerts").select("id", count="exact").execute()
+        total_alerts = total_result.count or 0
+
         total_pages = (total_alerts + limit - 1) // limit
 
         return jsonify({
@@ -104,6 +105,7 @@ def api_logs():
     except Exception as e:
         print("ERROR /api/logs:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 
 @app.route("/api/recent_alerts")
@@ -162,3 +164,4 @@ def traffic_api():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+
