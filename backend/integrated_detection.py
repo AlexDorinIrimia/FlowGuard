@@ -2,14 +2,11 @@ from datetime import datetime
 import threading
 import time
 from backend.ui_bridge import traffic_log
-import sys
-import os
-from DataBase.DataBase import Database
-sys.path.append(os.path.abspath('.'))
-from packet_capture.FlowManager import FlowManager
+from backend.DataBase.DataBase import Database
+from backend.packet_capture.FlowManager import FlowManager
 from ml_model.utils.AttackDetector import AttackDetector
-from packet_capture.packet_sniffer import PacketSniffer
-from alerting.Notifier import AlertManager
+from backend.packet_capture.packet_sniffer import PacketSniffer
+from backend.alerting.Notifier import AlertManager
 from backend.logging.logger import IDSLogger
 from backend.DataBase.DBAgent import AgentManager
 
