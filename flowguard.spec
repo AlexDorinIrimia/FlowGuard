@@ -1,23 +1,25 @@
 # flowguard_backend.spec
-
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, get_hook_config
 from PyInstaller.building.api import PYZ, EXE, COLLECT
 from PyInstaller.building.build_main import Analysis
 import os
+import scipy
+import glob
+import shutil
 
 block_cipher = None
 
+# Căutăm automat DLL-urile OpenBLAS din folderul scipy
+scipy_dlls = glob.glob(os.path.join(os.path.dirname(scipy.__file__), "*.dll"))
+binaries = [(dll, '.') for dll in scipy_dlls]
+
 a = Analysis(
-    ['run_ids.py'],  # Main entry point
+    ['run_ids.py'],
     pathex=[os.path.abspath('.')],
 
-    binaries=[
-
-        ('libs/msvcp140.dll', '.'),
-        ('libs/libscipy_openblas-f07f5a5d207a3a47104dca54d6d0c86a.dll', '.'),
-    ],
+    binaries=binaries,  # includem DLL-urile detectate automat
 
     datas=[
         # Modele ML
@@ -26,7 +28,6 @@ a = Analysis(
         # Web UI - HTML & statice
         ('web_ui/static/*', 'web_ui/static'),
         ('web_ui/templates/*', 'web_ui/templates'),
-
     ],
 
     hiddenimports=(
